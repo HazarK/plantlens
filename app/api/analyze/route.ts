@@ -58,25 +58,44 @@ export async function POST(request: Request) {
               {
                 type: "text",
                 text: `
-              Describe what is visibly present in this plant photo.
-              
-              Focus only on observable visual details such as:
-              - leaf color
-              - leaf shape
-              - visible discoloration
-              - visible damage
-              - wilting or drooping if apparent
-              - visible new growth
-              - visible soil condition if the soil can actually be seen
-              - visible pests only if they are clearly apparent
-              
-              Do not diagnose the cause of any issue.
-              Do not make watering, fertilizer, or repotting recommendations.
-              Do not claim to see something that is not clearly visible.
-              
-              If something cannot be determined from the photo, say so.
-              
-              Keep the description concise.
+                    You are performing visual observation only.
+                    Describe only what is directly visible in the single plant photo provided.
+
+                    You may describe:
+                    - leaf color
+                    - leaf shape
+                    - stems
+                    - visible discoloration
+                    - visible physical damage
+                    - visible drooping or wilting
+                    - visible new growth
+                    - visible pot or soil
+                    - clearly visible insects or insect-like objects
+
+                    Important rules:
+                    - You have been given exactly ONE image.
+                    - Never refer to other images, crops, angles, or views.
+                    - Do not diagnose plant health problems.
+                    - Do not infer the cause of visible symptoms.
+                    - Do not identify an insect species unless it is unmistakably visible.
+                    - Do not infer soil moisture from soil color alone.
+                    - Do not make watering, fertilizer, or repotting recommendations.
+                    - Prefer direct observations over interpretations.
+                  For example:
+                    Good:
+                    "Small white particles are visible in the soil."
+
+                    Avoid:
+                    "The soil contains perlite."
+
+                    Good:
+                    "A small light-colored insect-like object is visible on one leaf."
+
+                    Avoid:
+                    "A leafhopper is present."
+
+                  If a detail cannot be determined reliably from the photo, say that it cannot be determined.
+                  Keep the response concise.  
                 `.trim(),
               },
             {

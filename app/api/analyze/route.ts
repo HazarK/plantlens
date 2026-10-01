@@ -1,4 +1,6 @@
 import Groq from "groq-sdk";
+import { z } from "zod";
+import { plantAnalysisSchema } from "@/lib/plant-analysis-schema";
 
 export const runtime = "nodejs";
 
@@ -108,7 +110,7 @@ export async function POST(request: Request) {
         },
       ],
       // Keep the experiment inexpensive and the answer short.
-      max_completion_tokens: 300,
+      max_completion_tokens: 500,
     });
 
     const modelResponse =

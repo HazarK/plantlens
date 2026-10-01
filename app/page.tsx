@@ -15,6 +15,11 @@ type AnalyzeResponse = {
   error?: string;
 };
 
+type SpeciesReview = {
+  decision: "unreviewed" | "confirmed" | "corrected";
+  confirmedSpecies: string | null;
+};
+
 export default function Home() {
   /*
    * Store the image selected by the user.
@@ -25,6 +30,20 @@ export default function Home() {
    * Store the structured AI result.
    */
   const [analysis, setAnalysis] = useState<PlantAnalysis | null>(null);
+  /*
+  * Human review is stored separately from the AI output.
+  */
+  const [speciesReview, setSpeciesReview] = useState<SpeciesReview>({
+    decision: "unreviewed",
+    confirmedSpecies: null,
+  });
+
+  const [speciesCorrection, setSpeciesCorrection] = useState("");
+
+  /*
+  * Controls whether the correction form is currently visible.
+  */
+  const [isCorrectingSpecies, setIsCorrectingSpecies] = useState(false);
 
   /*
    * Lets us show loading feedback while Groq is working.
@@ -76,6 +95,17 @@ export default function Home() {
        * Updating state causes React to render the result below.
        */
       setAnalysis(data.analysis);
+      /*
+        * This is a new AI prediction, so it has not been reviewed yet.
+      */
+      setSpeciesReview({
+        decision: "unreviewed",
+        confirmedSpecies: null,
+      });
+
+      setSpeciesCorrection("");
+      setIsCorrectingSpecies(false);
+
     } catch (error) {
       if (error instanceof Error) {
         setError(error.message);
@@ -119,11 +149,19 @@ export default function Home() {
               className="hidden"
               onChange={(event) => {
                 const file = event.target.files?.[0] ?? null;
-
+              
                 setSelectedFile(file);
                 setAnalysis(null);
                 setError(null);
-            }}
+              
+                setSpeciesReview({
+                  decision: "unreviewed",
+                  confirmedSpecies: null,
+                });
+              
+                setSpeciesCorrection("");
+                setIsCorrectingSpecies(false);
+              }}
           />
           </label>
 
@@ -183,16 +221,149 @@ export default function Home() {
                 Identification
               </h2>
 
-              <p className="mt-3">
-                <span className="font-medium">Likely species:</span>{" "}
-                {analysis.likely_species ?? "Could not identify reliably"}
-              </p>
+              {/* Always preserve and display the original AI prediction. */}
+              <div className="mt-4 rounded-lg bg-slate-50 p-4">
+                <p className="text-sm font-medium text-slate-500">
+                  AI prediction
+                </p>
 
-              <p className="mt-1 text-sm text-slate-600">
-                Identification certainty:{" "}
-                {analysis.identification_certainty}
-              </p>
+                <p className="mt-1 text-lg font-semibold">
+                  {analysis.likely_species ?? "Could not identify reliably"}
+                </p>
+
+                <p className="mt-1 text-sm text-slate-600">
+                  AI certainty: {analysis.identification_certainty}
+                </p>
+              </div>
+
+              {/* No human decision yet. */}
+              {speciesReview.decision === "unreviewed" && (
+                <div className="mt-5">
+                  <p className="text-sm font-medium text-slate-700">
+                    Is this identification correct?
+                  </p>
+
+                  <div className="mt-3 flex flex-wrap gap-3">
+                   {analysis.likely_species && (
+                    <button
+                      type="button"
+                      className="rounded-lg bg-green-800 px-4 py-2 text-sm font-medium text-white hover:bg-green-900"
+                      onClick={() => {
+                      setSpeciesReview({
+                    decision: "confirmed",
+                    confirmedSpecies: analysis.likely_species,
+                  });
+                    setIsCorrectingSpecies(false);
+                  }}
+                >
+                  Confirm identification
+                    </button>
+                 )}
+                    <button
+                      type="button"
+                      className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                      onClick={() => {
+                        setIsCorrectingSpecies(true);
+                  }}
+                    >
+                      Correct identification
+                    </button>
+                </div>
             </div>
+          )}
+
+            {/* Correction form */}
+            {speciesReview.decision === "unreviewed" && isCorrectingSpecies && (
+              <div className="mt-5 rounded-lg border border-slate-200 p-4">
+                <label
+                  htmlFor="species-correction"
+                  className="block text-sm font-medium text-slate-700"
+                >
+                  Correct species
+                </label>
+                <input
+                  id="species-correction"
+                  type="text"
+                  value={speciesCorrection}
+                  onChange={(event) => {
+                    setSpeciesCorrection(event.target.value);
+                  }}
+                  placeholder="e.g. Philodendron hederaceum"
+                  className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-green-700"
+                />
+
+              <div className="mt-3 flex gap-3">
+                <button
+                  type="button"
+                  className="rounded-lg bg-green-800 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={!speciesCorrection.trim()}
+                  onClick={() => {
+                    const correctedSpecies = speciesCorrection.trim();
+                    if (!correctedSpecies) {
+                      return;
+                    }
+                  setSpeciesReview({
+                    decision: "corrected",
+                    confirmedSpecies: correctedSpecies,
+              });
+              setIsCorrectingSpecies(false);
+             }}
+                >
+                    Save correction
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                  onClick={() => {
+                    setIsCorrectingSpecies(false);
+                    setSpeciesCorrection("");
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+  {/* Human-reviewed result */}
+  {speciesReview.decision !== "unreviewed" && (
+    <div className="mt-5 rounded-lg bg-green-50 p-4">
+      <p className="text-sm font-medium text-green-800">
+        Human-confirmed species
+      </p>
+
+      <p className="mt-1 text-lg font-semibold text-green-950">
+        {speciesReview.confirmedSpecies}
+      </p>
+
+      <p className="mt-1 text-sm text-green-700">
+        {speciesReview.decision === "confirmed"
+          ? "AI prediction confirmed by user"
+          : "AI prediction corrected by user"}
+      </p>
+
+      <button
+        type="button"
+        className="mt-3 text-sm font-medium text-green-800 underline"
+        onClick={() => {
+          /*
+           * Allow the human review to be changed without
+           * touching the original AI result.
+           */
+          setSpeciesReview({
+            decision: "unreviewed",
+            confirmedSpecies: null,
+          });
+
+          setSpeciesCorrection("");
+          setIsCorrectingSpecies(false);
+        }}
+      >
+        Change review
+      </button>
+    </div>
+  )}
+</div>
 
             {/* Direct visual evidence */}
             <div className="rounded-2xl bg-white p-6 shadow-sm">

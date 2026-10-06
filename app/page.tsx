@@ -54,6 +54,30 @@ export default function Home() {
    * Store a user-facing error if something goes wrong.
    */
   const [error, setError] = useState<string | null>(null);
+  /*
+  * Nickname for the persistent Plant profile.
+  */
+  const [plantNickname, setPlantNickname] = useState("");
+
+  /*
+  * Save-request state.
+  */
+  const [isSaving, setIsSaving] = useState(false);
+
+  const [saveError, setSaveError] = useState<string | null>(
+    null
+  );
+
+  /*
+  * IDs returned by Supabase after a successful save.
+  *
+  * Keeping them lets us show that a real persistent record
+  * was created.
+  */
+  const [savedPlant, setSavedPlant] = useState<{
+    plantId: string;
+    observationId: string;
+  } | null>(null);
 
   async function handleAnalyze() {
     /*
@@ -119,6 +143,81 @@ export default function Home() {
       setIsAnalyzing(false);
     }
   }
+  
+  async function handleSavePlant() {
+    if (!selectedFile) {
+      setSaveError("The original plant photo is missing.");
+      return;
+    }
+  
+    if (!analysis) {
+      setSaveError("Analyze the plant before saving it.");
+      return;
+    }
+  
+    const nickname = plantNickname.trim();
+  
+    if (!nickname) {
+      setSaveError("Give this plant a nickname first.");
+      return;
+    }
+  
+    setIsSaving(true);
+    setSaveError(null);
+  
+    try {
+      const formData = new FormData();
+  
+      /*
+       * Send the same original image that was analyzed.
+       */
+      formData.append("image", selectedFile);
+  
+      formData.append("nickname", nickname);
+  
+      /*
+       * FormData cannot directly contain arbitrary JavaScript
+       * objects, so serialize structured values to JSON strings.
+       */
+      formData.append(
+        "analysis",
+        JSON.stringify(analysis)
+      );
+  
+      formData.append(
+        "speciesReview",
+        JSON.stringify(speciesReview)
+      );
+  
+      const response = await fetch("/api/plants", {
+        method: "POST",
+        body: formData,
+      });
+  
+      const data = await response.json();
+  
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.error || "Could not save the plant."
+        );
+      }
+  
+      setSavedPlant({
+        plantId: data.plant.id,
+        observationId: data.observation.id,
+      });
+    } catch (error) {
+      if (error instanceof Error) {
+        setSaveError(error.message);
+      } else {
+        setSaveError(
+          "Something unexpected happened while saving."
+        );
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
   return (
     <main className="min-h-screen bg-green-50 px-6 py-12 text-slate-900">
@@ -153,6 +252,9 @@ export default function Home() {
                 setSelectedFile(file);
                 setAnalysis(null);
                 setError(null);
+                setPlantNickname("");
+                setSaveError(null);
+                setSavedPlant(null);
               
                 setSpeciesReview({
                   decision: "unreviewed",
@@ -498,6 +600,72 @@ export default function Home() {
                 </p>
               </div>
             )}
+            <div className="rounded-2xl bg-white p-6 shadow-sm">
+              <h2 className="text-xl font-semibold">
+                Save this plant
+              </h2>
+
+              <p className="mt-2 text-sm text-slate-600">
+                This will create a plant profile and save this analysis
+                as its first observation.
+              </p>
+
+              {!savedPlant ? (
+                <>
+                  <label
+                    htmlFor="plant-nickname"
+                    className="mt-5 block text-sm font-medium text-slate-700"
+                  >
+                    Plant nickname
+                  </label>
+
+                  <input
+                    id="plant-nickname"
+                    type="text"
+                    value={plantNickname}
+                    onChange={(event) => {
+                      setPlantNickname(event.target.value);
+                      setSaveError(null);
+                    }}
+                    placeholder="e.g. Living room Tradescantia"
+                    className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-green-700"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={handleSavePlant}
+                    disabled={
+                      !plantNickname.trim() ||
+                      isSaving ||
+                      !selectedFile
+                    }
+                    className="mt-4 rounded-lg bg-green-800 px-5 py-2.5 font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isSaving ? "Saving..." : "Save plant"}
+                  </button>
+
+                  {saveError && (
+                    <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                      {saveError}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <div className="mt-5 rounded-lg bg-green-50 p-4">
+                  <p className="font-medium text-green-900">
+                    Plant saved successfully.
+                  </p>
+
+                  <p className="mt-2 text-sm text-green-800">
+                    Plant ID: {savedPlant.plantId}
+                  </p>
+
+                  <p className="mt-1 text-sm text-green-800">
+                    Observation ID: {savedPlant.observationId}
+                  </p>
+                </div>
+              )}
+</div>
           </section>
         )}
       </div>

@@ -1,6 +1,7 @@
 import Groq from "groq-sdk";
 import { z } from "zod";
 import { plantAnalysisSchema } from "@/lib/plant-analysis-schema";
+import { PLANT_ANALYSIS_MODEL } from "@/lib/plant-analysis-config";
 
 export const runtime = "nodejs";
 
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
 
     // Send BOTH text instructions and the image to Groq
     const completion = await groq.chat.completions.create({
-      model: "qwen/qwen3.8-27b",
+      model: PLANT_ANALYSIS_MODEL,
       
       messages: [
         {
@@ -250,7 +251,7 @@ export async function POST(request: Request) {
     
     return Response.json({
       success: true,
-      model: "qwen/qwen3.8-27b",
+      model: PLANT_ANALYSIS_MODEL,
       filename: image.name,
       analysis,
     });

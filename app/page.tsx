@@ -1,7 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import {
+  useEffect,
+  useState,
+} from "react";
+
 import type { PlantAnalysis } from "@/lib/plant-analysis-schema"; 
+
+import type {
+  PlantComparison,
+} from "@/lib/plant-comparison-schema";
 
 /*
  * frontend knows the exact structure of the AI result. 
@@ -13,6 +21,12 @@ type AnalyzeResponse = {
   filename?: string;
   analysis?: PlantAnalysis;
   error?: string;
+};
+
+type SavedPlantOption = {
+  id: string;
+  nickname: string;
+  confirmed_species: string | null;
 };
 
 type SpeciesReview = {
@@ -60,6 +74,54 @@ export default function Home() {
   const [plantNickname, setPlantNickname] = useState("");
 
   /*
+  * List of existing plants that can be selected for comparison.
+  */
+
+  const [existingPlants, setExistingPlants] = useState<SavedPlantOption[]>([]);
+
+  const [selectedExistingPlantId, setSelectedExistingPlantId] = useState("");
+
+  const [isSavingObservation, setIsSavingObservation] = useState(false);
+
+  const [observationSaveError, setObservationSaveError] = useState<string | null>(null);
+
+  type LongitudinalComparison = {
+    deterministic: {
+      previousStatus:
+        | "healthy"
+        | "watch"
+        | "needs_attention"
+        | "uncertain";
+  
+      currentStatus:
+        | "healthy"
+        | "watch"
+        | "needs_attention"
+        | "uncertain";
+  
+      statusDirection:
+        | "improving"
+        | "stable"
+        | "worsening"
+        | "uncertain";
+  
+      previousNeedsReview: boolean;
+      currentNeedsReview: boolean;
+    };
+  
+    semantic: PlantComparison | null;
+  
+    semanticComparisonFailed: boolean;
+  };
+  
+  const [
+    comparisonResult,
+    setComparisonResult,
+  ] = useState<LongitudinalComparison | null>(
+    null
+  );
+
+  /*
   * Save-request state.
   */
   const [isSaving, setIsSaving] = useState(false);
@@ -78,6 +140,104 @@ export default function Home() {
     plantId: string;
     observationId: string;
   } | null>(null);
+
+  useEffect(() => {
+    async function loadPlants() {
+      try {
+        const response = await fetch("/api/plants");
+  
+        const data = await response.json();
+  
+        if (!response.ok || !data.success) {
+          throw new Error(
+            data.error || "Could not load plants."
+          );
+        }
+  
+        setExistingPlants(data.plants);
+      } catch (error) {
+        console.error(
+          "Failed to load existing plants:",
+          error
+        );
+      }
+    }
+  
+    loadPlants();
+  }, []);
+  async function handleSaveObservation() {
+    if (!selectedExistingPlantId) {
+      setObservationSaveError(
+        "Choose an existing plant first."
+      );
+      return;
+    }
+  
+    if (!selectedFile || !analysis) {
+      setObservationSaveError(
+        "Analyze a photo before saving an observation."
+      );
+      return;
+    }
+  
+    setIsSavingObservation(true);
+    setObservationSaveError(null);
+    setComparisonResult(null);
+  
+    try {
+      const formData = new FormData();
+  
+      formData.append(
+        "image",
+        selectedFile
+      );
+  
+      formData.append(
+        "analysis",
+        JSON.stringify(analysis)
+      );
+  
+      formData.append(
+        "speciesReview",
+        JSON.stringify(speciesReview)
+      );
+  
+      const response = await fetch(
+        `/api/plants/${selectedExistingPlantId}/observations`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+  
+      const data = await response.json();
+  
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.error ||
+            "Could not save observation."
+        );
+      }
+  
+      if (data.comparison) {
+        setComparisonResult(
+          data.comparison
+        );
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        setObservationSaveError(
+          error.message
+        );
+      } else {
+        setObservationSaveError(
+          "Something unexpected happened."
+        );
+      }
+    } finally {
+      setIsSavingObservation(false);
+    }
+  }
 
   async function handleAnalyze() {
     /*
@@ -665,7 +825,241 @@ export default function Home() {
                   </p>
                 </div>
               )}
-</div>
+              </div>
+              <div className="rounded-2xl bg-white p-6 shadow-sm">
+                <h2 className="text-xl font-semibold">
+                  Add check-in to an existing plant
+                </h2>
+
+                <p className="mt-2 text-sm text-slate-600">
+                  Save this analysis as the next observation for a plant
+                  you already created.
+                </p>
+
+                <label
+                  htmlFor="existing-plant"
+                  className="mt-5 block text-sm font-medium text-slate-700"
+                >
+                  Existing plant
+                </label>
+
+                <select
+                  id="existing-plant"
+                  value={selectedExistingPlantId}
+                  onChange={(event) => {
+                    setSelectedExistingPlantId(
+                      event.target.value
+                    );
+
+                    setComparisonResult(null);
+                    setObservationSaveError(null);
+                  }}
+                  className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2"
+                >
+                  <option value="">
+                    Choose a plant
+                  </option>
+
+                  {existingPlants.map((plant) => (
+                    <option
+                      key={plant.id}
+                      value={plant.id}
+                    >
+                      {plant.nickname}
+                      {plant.confirmed_species
+                        ? ` — ${plant.confirmed_species}`
+                        : ""}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  type="button"
+                  disabled={
+                    !selectedExistingPlantId ||
+                    isSavingObservation
+                  }
+                  onClick={handleSaveObservation}
+                  className="mt-4 rounded-lg bg-green-800 px-5 py-2.5 font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isSavingObservation
+                    ? "Saving check-in..."
+                    : "Save check-in"}
+                </button>
+
+                {observationSaveError && (
+                  <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                    {observationSaveError}
+                  </p>
+                )}
+
+                {comparisonResult && (
+                  <div className="mt-5 space-y-4">
+                    {/* Deterministic comparison */}
+                    <div className="rounded-lg bg-green-50 p-4">
+                      <p className="font-medium text-green-900">
+                        Check-in saved.
+                      </p>
+
+                      <p className="mt-3 text-sm text-green-800">
+                        Previous status:{" "}
+                        {
+                          comparisonResult
+                            .deterministic
+                            .previousStatus
+                        }
+                      </p>
+
+                      <p className="text-sm text-green-800">
+                        Current status:{" "}
+                        {
+                          comparisonResult
+                            .deterministic
+                            .currentStatus
+                        }
+                      </p>
+
+                      <p className="mt-2 font-medium text-green-950">
+                        Status direction:{" "}
+                        {
+                          comparisonResult
+                            .deterministic
+                            .statusDirection
+                        }
+                      </p>
+                   </div>
+
+    {/* Semantic comparison */}
+    {comparisonResult?.semantic && (
+      <div className="rounded-lg border border-slate-200 p-4">
+        <p className="text-sm font-medium uppercase tracking-wide text-slate-500">
+          Compared with previous check-in
+        </p>
+
+        <h3 className="mt-2 text-xl font-semibold">
+          {comparisonResult.semantic.trend}
+        </h3>
+
+        <p className="mt-3 text-slate-700">
+          {comparisonResult.semantic.summary}
+        </p>
+
+        <p className="mt-2 text-xs text-slate-500">
+          Comparison certainty:{" "}
+          {
+            comparisonResult.semantic
+              .trend_certainty
+          }
+        </p>
+
+        {comparisonResult.semantic.changes.length >
+          0 && (
+          <div className="mt-5">
+            <h4 className="font-medium">
+              Observed changes
+            </h4>
+
+            <ul className="mt-3 space-y-3">
+              {comparisonResult.semantic.changes.map(
+                (change, index) => (
+                  <li
+                    key={index}
+                    className="rounded-lg bg-slate-50 p-3"
+                  >
+                    <p className="font-medium">
+                      {change.aspect}
+                    </p>
+
+                    <p className="mt-1 text-sm">
+                      Change: {change.direction}
+                    </p>
+
+                    {change.previous_evidence && (
+                      <p className="mt-2 text-sm text-slate-600">
+                        Before:{" "}
+                        {
+                          change.previous_evidence
+                        }
+                      </p>
+                    )}
+
+                    {change.current_evidence && (
+                      <p className="mt-1 text-sm text-slate-600">
+                        Now:{" "}
+                        {
+                          change.current_evidence
+                        }
+                      </p>
+                    )}
+
+                    <p className="mt-2 text-xs text-slate-500">
+                      Certainty:{" "}
+                      {change.certainty}
+                    </p>
+                  </li>
+                )
+              )}
+            </ul>
+          </div>
+        )}
+
+        {comparisonResult.semantic.limitations
+          .length > 0 && (
+          <div className="mt-5">
+            <p className="text-sm font-medium">
+              Comparison limitations
+            </p>
+
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
+              {comparisonResult.semantic.limitations.map(
+                (limitation, index) => (
+                  <li key={index}>
+                    {limitation}
+                  </li>
+                )
+              )}
+            </ul>
+          </div>
+        )}
+
+        {comparisonResult.semantic
+          .needs_review && (
+          <div className="mt-5 rounded-lg bg-amber-50 p-3">
+            <p className="font-medium text-amber-900">
+              Comparison needs review
+            </p>
+
+            <p className="mt-1 text-sm text-amber-800">
+              {comparisonResult.semantic
+                .review_reason ??
+                "The available observations do not support a confident comparison."}
+            </p>
+          </div>
+        )}
+      </div>
+    )}
+
+    {/* Graceful-degradation state */}
+    {comparisonResult
+      .semanticComparisonFailed && (
+      <div className="rounded-lg bg-amber-50 p-4">
+        <p className="font-medium text-amber-900">
+          Check-in saved, but the detailed comparison
+          could not be generated.
+        </p>
+
+        <p className="mt-1 text-sm text-amber-800">
+          Your observation is safely stored. The
+          status comparison above is still available.
+        </p>
+      </div>
+    )}
+  </div>
+                )}
+
+
+
+              </div>
           </section>
         )}
       </div>

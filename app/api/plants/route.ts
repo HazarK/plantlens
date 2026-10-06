@@ -55,6 +55,51 @@ const speciesReviewSchema = z
     }
   });
 
+/*
+ * GET /api/plants
+ *
+ * Return the plants that already exist so the UI can let
+ * the user choose one for a new check-in.
+ */
+export async function GET() {
+  try {
+    const supabase = createSupabaseServerClient();
+
+    const { data, error } = await supabase
+      .from("plants")
+      .select(
+        `
+          id,
+          nickname,
+          confirmed_species,
+          created_at
+        `
+      )
+      .order("created_at", {
+        ascending: false,
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    return Response.json({
+      success: true,
+      plants: data,
+    });
+
+  } catch (error) {
+      console.error("Failed to load plants:", error);
+      return Response.json(
+        {
+          success: false,
+          error: "Could not load plants.",
+        },
+        { status: 500 }
+      );
+    }
+}
+
 export async function POST(request: Request) {
   const supabase = createSupabaseServerClient();
 

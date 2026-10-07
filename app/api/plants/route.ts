@@ -55,51 +55,161 @@ const speciesReviewSchema = z
     }
   });
 
-/*
- * GET /api/plants
- *
- * Return the plants that already exist so the UI can let
- * the user choose one for a new check-in.
- */
-export async function GET() {
-  try {
-    const supabase = createSupabaseServerClient();
-
-    const { data, error } = await supabase
-      .from("plants")
-      .select(
-        `
-          id,
-          nickname,
-          confirmed_species,
-          created_at
-        `
-      )
-      .order("created_at", {
-        ascending: false,
+  export async function GET() {
+    try {
+      const supabase = createSupabaseServerClient();
+  
+      // Load the stable Plant-level information.
+      const { data: plants, error: plantsError } =
+        await supabase
+          .from("plants")
+          .select(
+            `
+              id,
+              nickname,
+              confirmed_species,
+              location_city,
+              location_country,
+              placement,
+              light_exposure,
+              created_at
+            `
+          )
+          .order("created_at", {
+            ascending: false,
+          });
+  
+      if (plantsError) {
+        throw plantsError;
+      }
+  
+      if (!plants || plants.length === 0) {
+        return Response.json({
+          success: true,
+          plants: [],
+        });
+      }
+  
+      // Get observations for these plants so we can determine
+      // each plant's newest/current status.
+      const plantIds = plants.map(
+        (plant) => plant.id
+      );
+  
+      const {
+        data: observations,
+        error: observationsError,
+      } = await supabase
+        .from("observations")
+        .select(
+          `
+            plant_id,
+            status,
+            created_at
+          `
+        )
+        .in("plant_id", plantIds)
+        .order("created_at", {
+          ascending: false,
+        });
+  
+      if (observationsError) {
+        throw observationsError;
+      }
+  
+      /*
+       * Because observations are ordered newest first,
+       * the first one encountered for each plant is its
+       * latest observation.
+       */
+      const latestObservationByPlant = new Map<
+        string,
+        {
+          status: string;
+          created_at: string;
+        }
+      >();
+  
+      for (const observation of observations ?? []) {
+        if (
+          !latestObservationByPlant.has(
+            observation.plant_id
+          )
+        ) {
+          latestObservationByPlant.set(
+            observation.plant_id,
+            {
+              status: observation.status,
+              created_at:
+                observation.created_at,
+            }
+          );
+        }
+      }
+  
+      // Build the response specifically for the Plant Library.
+      const plantLibrary = plants.map(
+        (plant) => {
+          const latestObservation =
+            latestObservationByPlant.get(
+              plant.id
+            );
+  
+          return {
+            id: plant.id,
+            nickname: plant.nickname,
+  
+            confirmed_species:
+              plant.confirmed_species,
+  
+            location_city:
+              plant.location_city,
+  
+            location_country:
+              plant.location_country,
+  
+            placement:
+              plant.placement,
+  
+            light_exposure:
+              plant.light_exposure,
+  
+            created_at:
+              plant.created_at,
+  
+            latest_status:
+              latestObservation?.status ??
+              null,
+  
+            last_checked_at:
+              latestObservation?.created_at ??
+              null,
+          };
+        }
+      );
+  
+      return Response.json({
+        success: true,
+        plants: plantLibrary,
       });
-
-    if (error) {
-      throw error;
-    }
-
-    return Response.json({
-      success: true,
-      plants: data,
-    });
-
-  } catch (error) {
-      console.error("Failed to load plants:", error);
+    } catch (error) {
+      console.error(
+        "Failed to load plant library:",
+        error
+      );
+  
       return Response.json(
         {
           success: false,
-          error: "Could not load plants.",
+          error:
+            "Could not load the plant library.",
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
-}
-
+  }
 export async function POST(request: Request) {
   const supabase = createSupabaseServerClient();
 

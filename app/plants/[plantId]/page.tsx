@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import type { PlantCareProfile } from "@/lib/plant-care-profile-schema";
+import { CareProfilePanel } from "./care-profile-panel";
 
 type PlantProfile = {
   id: string;
@@ -150,7 +151,7 @@ export default function PlantDetailPage() {
 
   return (
     <main className="min-h-screen bg-green-50 px-6 py-12 text-slate-900">
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-6xl">
         <header className="mb-10">
           <Link
             href="/plants"
@@ -266,53 +267,17 @@ export default function PlantDetailPage() {
               )}
 
               {careProfile ? (
-                <div className="mt-6 space-y-5 text-sm text-slate-700">
-                  <p>{careProfile.overview}</p>
-
-                  <CareSection
-                    title="Light"
-                    body={careProfile.light.guidance}
-                    extra={careProfile.light.afternoon_sun_guidance}
-                  />
-                  <CareSection
-                    title="Watering"
-                    body={careProfile.watering.guidance}
-                    extra={careProfile.watering.before_watering_check}
-                  />
-                  <CareSection
-                    title="Fertilizer"
-                    body={careProfile.fertilizer.guidance}
-                    extra={careProfile.fertilizer.winter_guidance}
-                  />
-                  <CareSection
-                    title="Placement"
-                    body={careProfile.placement.guidance}
-                  />
-                  <CareSection
-                    title="Growing context"
-                    body={careProfile.growing_context_assessment.summary}
-                  />
-
-                  {careProfile.useful_notes.length > 0 && (
-                    <div>
-                      <h3 className="font-semibold text-slate-900">Notes</h3>
-                      <ul className="mt-2 list-disc space-y-1 pl-5">
-                        {careProfile.useful_notes.map((note) => (
-                          <li key={note}>{note}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {plant.care_profile_generated_at && (
-                    <p className="text-xs text-slate-400">
-                      Generated {formatDate(plant.care_profile_generated_at)}
-                      {plant.care_profile_model
-                        ? ` · ${plant.care_profile_model}`
-                        : ""}
-                    </p>
-                  )}
-                </div>
+                <CareProfilePanel
+                  careProfile={careProfile}
+                  growingContext={{
+                    locationCity: plant.location_city,
+                    locationCountry: plant.location_country,
+                    placement: plant.placement,
+                    lightExposure: plant.light_exposure,
+                  }}
+                  generatedAt={plant.care_profile_generated_at}
+                  generatedModel={plant.care_profile_model}
+                />
               ) : (
                 <p className="mt-4 text-sm text-slate-600">
                   No care profile yet.
@@ -323,23 +288,5 @@ export default function PlantDetailPage() {
         )}
       </div>
     </main>
-  );
-}
-
-function CareSection({
-  title,
-  body,
-  extra,
-}: {
-  title: string;
-  body: string;
-  extra?: string;
-}) {
-  return (
-    <div>
-      <h3 className="font-semibold text-slate-900">{title}</h3>
-      <p className="mt-1">{body}</p>
-      {extra && <p className="mt-1 text-slate-500">{extra}</p>}
-    </div>
   );
 }

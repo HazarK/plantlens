@@ -11,6 +11,7 @@ import type {
   PlantComparison,
 } from "@/lib/plant-comparison-schema";
 
+import Link from "next/link";
 /*
  * frontend knows the exact structure of the AI result. 
  * PlantAnalysis itself comes from the Zod schema we already created.
@@ -391,6 +392,10 @@ export default function Home() {
           <p className="mt-2 text-green-800">
             Upload a plant photo to get a structured visual assessment.
           </p>
+          <Link href="/plants"
+            className="inline-flex rounded-lg border border-green-800 px-4 py-2 text-sm font-medium text-green-800 hover:bg-green-100">
+            View my plants
+          </Link>
         </header>
 
         {/* Upload section */}

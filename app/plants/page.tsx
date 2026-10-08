@@ -54,6 +54,10 @@ type PlantLibraryItem = {
   last_checked_at:
     | string
     | null;
+
+  latest_photo_url:
+    | string
+    | null;
 };
 
 
@@ -251,75 +255,94 @@ export default function PlantsPage() {
 
                   href={`/plants/${plant.id}`}
 
-                  className="group rounded-2xl bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                  className="group overflow-hidden rounded-2xl bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                 >
-                  {/* Status */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h2 className="text-xl font-semibold text-slate-950 group-hover:text-green-900">
-                        {plant.nickname}
-                      </h2>
-
-                      <p className="mt-1 text-sm italic text-slate-600">
-                        {plant.confirmed_species ??
-                          "Species not confirmed"}
-                      </p>
-                    </div>
-
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusClasses(
-                        plant.latest_status
-                      )}`}
-                    >
-                      {plant.latest_status
-                        ? formatLabel(
-                            plant.latest_status
-                          )
-                        : "No status"}
-                    </span>
-                  </div>
-
-
-                  {/* Growing context */}
-                  <div className="mt-6 border-t border-slate-100 pt-4">
-                    <p className="text-sm text-slate-700">
-                      {formatLabel(
-                        plant.placement
-                      )}
-                      {" · "}
-                      {formatLabel(
-                        plant.light_exposure
-                      )}
-                    </p>
-
-                    {plant.location_city && (
-                      <p className="mt-1 text-sm text-slate-500">
-                        {plant.location_city}
-                        {plant.location_country
-                          ? `, ${plant.location_country}`
-                          : ""}
-                      </p>
+                  <div className="h-36 bg-green-100">
+                    {plant.latest_photo_url ? (
+                      // Signed Storage URLs change on each load, so the
+                      // browser fetches the photo directly.
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={plant.latest_photo_url}
+                        alt={`Latest photo of ${plant.nickname}`}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center px-4 text-sm text-green-800">
+                        No photo yet
+                      </div>
                     )}
                   </div>
 
+                  <div className="p-6">
+                    {/* Status */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h2 className="text-xl font-semibold text-slate-950 group-hover:text-green-900">
+                          {plant.nickname}
+                        </h2>
 
-                  {/* Last check-in */}
-                  <div className="mt-5">
-                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                      Last checked
-                    </p>
+                        <p className="mt-1 text-sm italic text-slate-600">
+                          {plant.confirmed_species ??
+                            "Species not confirmed"}
+                        </p>
+                      </div>
 
-                    <p className="mt-1 text-sm text-slate-700">
-                      {formatDate(
-                        plant.last_checked_at
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusClasses(
+                          plant.latest_status
+                        )}`}
+                      >
+                        {plant.latest_status
+                          ? formatLabel(
+                              plant.latest_status
+                            )
+                          : "No status"}
+                      </span>
+                    </div>
+
+
+                    {/* Growing context */}
+                    <div className="mt-6 border-t border-slate-100 pt-4">
+                      <p className="text-sm text-slate-700">
+                        {formatLabel(
+                          plant.placement
+                        )}
+                        {" · "}
+                        {formatLabel(
+                          plant.light_exposure
+                        )}
+                      </p>
+
+                      {plant.location_city && (
+                        <p className="mt-1 text-sm text-slate-500">
+                          {plant.location_city}
+                          {plant.location_country
+                            ? `, ${plant.location_country}`
+                            : ""}
+                        </p>
                       )}
+                    </div>
+
+
+                    {/* Last check-in */}
+                    <div className="mt-5">
+                      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                        Last checked
+                      </p>
+
+                      <p className="mt-1 text-sm text-slate-700">
+                        {formatDate(
+                          plant.last_checked_at
+                        )}
+                      </p>
+                    </div>
+
+
+                    <p className="mt-5 text-sm font-medium text-green-800">
+                      View plant →
                     </p>
                   </div>
-
-
-                  <p className="mt-5 text-sm font-medium text-green-800">
-                    View plant →
-                  </p>
                 </Link>
               ))}
             </div>

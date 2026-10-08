@@ -1,10 +1,77 @@
 import {
+    plantAnalysisSchema,
+  } from "@/lib/plant-analysis-schema";
+
+  import {
     plantCareProfileSchema,
   } from "@/lib/plant-care-profile-schema";
   
   import {
     createSupabaseServerClient,
   } from "@/lib/supabase/server";
+
+  const PLANT_STATUSES = [
+    "healthy",
+    "watch",
+    "needs_attention",
+    "uncertain",
+  ] as const;
+
+  type PlantStatus = (typeof PLANT_STATUSES)[number];
+
+  function isPlantStatus(
+    value: string
+  ): value is PlantStatus {
+    return (
+      PLANT_STATUSES as readonly string[]
+    ).includes(value);
+  }
+
+  /*
+   * History shows one sentence per check-in.
+   * Prefer the stored analysis summary, then fall back
+   * to the status label if that summary is missing.
+   */
+  function firstSentence(text: string) {
+    const sentence =
+      text.split(/(?<=[.!?])\s+/)[0]?.trim() ??
+      text.trim();
+
+    return sentence;
+  }
+
+  function statusSentence(status: PlantStatus) {
+    switch (status) {
+      case "healthy":
+        return "This check-in looked healthy.";
+      case "watch":
+        return "This check-in suggested keeping an eye on the plant.";
+      case "needs_attention":
+        return "This check-in suggested the plant needs attention.";
+      case "uncertain":
+        return "This check-in did not give a clear status.";
+    }
+  }
+
+  function checkInSummary(
+    aiAnalysis: unknown,
+    status: PlantStatus
+  ) {
+    const parsed =
+      plantAnalysisSchema.safeParse(aiAnalysis);
+
+    if (parsed.success) {
+      const sentence = firstSentence(
+        parsed.data.summary
+      );
+
+      if (sentence) {
+        return sentence;
+      }
+    }
+
+    return statusSentence(status);
+  }
   
   type RouteContext = {
     params: Promise<{
@@ -64,11 +131,13 @@ import {
       }
   
       // -------------------------------------------------------
-      // 2. LOAD ONLY THE LATEST OBSERVATION
+      // 2. LOAD CHECK-IN HISTORY
+      //
+      // Newest first. The first row is also the latest status.
       // -------------------------------------------------------
   
       const {
-        data: latestObservation,
+        data: observations,
         error: observationError,
       } = await supabase
         .from("observations")
@@ -76,19 +145,40 @@ import {
           `
             id,
             status,
-            created_at
+            created_at,
+            ai_analysis
           `
         )
         .eq("plant_id", plantId)
         .order("created_at", {
           ascending: false,
-        })
-        .limit(1)
-        .maybeSingle();
+        });
   
       if (observationError) {
         throw observationError;
       }
+
+      const history = (observations ?? []).flatMap(
+        (observation) => {
+          if (!isPlantStatus(observation.status)) {
+            return [];
+          }
+
+          return [
+            {
+              id: observation.id,
+              created_at: observation.created_at,
+              status: observation.status,
+              summary: checkInSummary(
+                observation.ai_analysis,
+                observation.status
+              ),
+            },
+          ];
+        }
+      );
+
+      const latestObservation = history[0] ?? null;
   
       // -------------------------------------------------------
       // 3. VALIDATE THE STORED CARE PROFILE
@@ -175,6 +265,8 @@ import {
           latest_observation_id:
             latestObservation?.id ??
             null,
+
+          history,
         },
       });
     } catch (error) {

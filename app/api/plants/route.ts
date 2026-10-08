@@ -105,7 +105,8 @@ const speciesReviewSchema = z
           `
             plant_id,
             status,
-            created_at
+            created_at,
+            photo_storage_path
           `
         )
         .in("plant_id", plantIds)
@@ -127,6 +128,7 @@ const speciesReviewSchema = z
         {
           status: string;
           created_at: string;
+          photo_storage_path: string;
         }
       >();
   
@@ -142,8 +144,54 @@ const speciesReviewSchema = z
               status: observation.status,
               created_at:
                 observation.created_at,
+              photo_storage_path:
+                observation.photo_storage_path,
             }
           );
+        }
+      }
+
+      /*
+       * Photos live in a private bucket. Sign only the newest
+       * photo for each plant so the library cards can show it.
+       */
+      const latestPhotoPaths = [
+        ...latestObservationByPlant.values(),
+      ].map(
+        (observation) =>
+          observation.photo_storage_path
+      );
+
+      const photoUrlByPath = new Map<
+        string,
+        string
+      >();
+
+      if (latestPhotoPaths.length > 0) {
+        const {
+          data: signedPhotos,
+          error: signedPhotosError,
+        } = await supabase.storage
+          .from("plant-photos")
+          .createSignedUrls(
+            latestPhotoPaths,
+            60 * 60
+          );
+
+        if (signedPhotosError) {
+          throw signedPhotosError;
+        }
+
+        for (const signedPhoto of signedPhotos ?? []) {
+          if (
+            signedPhoto.path &&
+            signedPhoto.signedUrl
+          ) {
+            photoUrlByPath.set(
+              signedPhoto.path,
+              signedPhoto.signedUrl
+            );
+          }
         }
       }
   
@@ -184,6 +232,13 @@ const speciesReviewSchema = z
             last_checked_at:
               latestObservation?.created_at ??
               null,
+
+            latest_photo_url:
+              latestObservation
+                ? photoUrlByPath.get(
+                    latestObservation.photo_storage_path
+                  ) ?? null
+                : null,
           };
         }
       );

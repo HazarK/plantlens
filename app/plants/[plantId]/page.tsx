@@ -34,6 +34,14 @@ type PlantProfile = {
   latest_status: "healthy" | "watch" | "needs_attention" | "uncertain" | null;
   last_checked_at: string | null;
   latest_observation_id: string | null;
+  history: CheckInHistoryEntry[];
+};
+
+type CheckInHistoryEntry = {
+  id: string;
+  created_at: string;
+  status: "healthy" | "watch" | "needs_attention" | "uncertain";
+  summary: string;
 };
 
 function formatLabel(value: string | null) {
@@ -55,6 +63,16 @@ function formatDate(value: string | null) {
     day: "numeric",
     month: "short",
     year: "numeric",
+  }).format(new Date(value));
+}
+
+function formatCheckInDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   }).format(new Date(value));
 }
 
@@ -212,6 +230,48 @@ export default function PlantDetailPage() {
                   Last checked {formatDate(plant.last_checked_at)}
                 </p>
               </div>
+            </section>
+
+            <section className="rounded-2xl bg-white p-6 shadow-sm">
+              <h2 className="text-xl font-semibold text-slate-950">
+                Check-in history
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                When each photo was uploaded, and how the plant looked.
+              </p>
+
+              {plant.history.length === 0 ? (
+                <p className="mt-4 text-sm text-slate-600">
+                  No check-ins yet.
+                </p>
+              ) : (
+                <ol className="mt-5 space-y-4">
+                  {plant.history.map((entry) => (
+                    <li
+                      key={entry.id}
+                      className="border-t border-slate-100 pt-4 first:border-t-0 first:pt-0"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-medium text-slate-900">
+                          <time dateTime={entry.created_at}>
+                            {formatCheckInDate(entry.created_at)}
+                          </time>
+                        </p>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusClasses(
+                            entry.status
+                          )}`}
+                        >
+                          {formatLabel(entry.status)}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                        {entry.summary}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              )}
             </section>
 
             <section className="rounded-2xl bg-white p-6 shadow-sm">
